@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc_library_v1_tutorial/providers/weather_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/model/weather.dart';
-import '../notifiers/weather_state.dart';
-import 'weather_search_page.dart';
 
 class WeatherDetailPage extends ConsumerStatefulWidget {
   final Weather masterWeather;
@@ -23,7 +22,7 @@ class _WeatherDetailPageState extends ConsumerState<WeatherDetailPage> {
     Future.delayed(
         Duration.zero,
         () => ref
-            .read(weatherStateNotifierProvider.notifier)
+            .read(asyncWeatherProvider.notifier)
             .getDetailedWeather(widget.masterWeather.cityName));
     super.initState();
   }
@@ -39,15 +38,19 @@ class _WeatherDetailPageState extends ConsumerState<WeatherDetailPage> {
         alignment: Alignment.center,
         child: Consumer(
           builder: (_, watch, child) {
-            final state = ref.watch(weatherStateNotifierProvider);
+            final state = ref.watch(asyncWeatherProvider);
 
-            if (state is WeatherLoading) {
-              return buildLoading();
-            } else if (state is WeatherLoaded) {
-              return buildColumnWithData(context, state.weather);
-            } else {
-              return SizedBox.shrink();
-            }
+            return state.maybeWhen(
+              data: (Weather? weather) {
+                if (weather == null) {
+                  return SizedBox.shrink();
+                }
+
+                return buildColumnWithData(context, weather);
+              },
+              loading: () => buildLoading(),
+              orElse: () => SizedBox.shrink(),
+            );
           },
         ),
       ),

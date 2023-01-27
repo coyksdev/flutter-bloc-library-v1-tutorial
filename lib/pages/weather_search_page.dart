@@ -1,26 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc_library_v1_tutorial/providers/weather_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/model/weather.dart';
-import '../notifiers/weather_state.dart';
-import '../notifiers/weather_state_notifier.dart';
 import 'weather_detail_page.dart';
-
-final weatherStateNotifierProvider =
-    StateNotifierProvider<WeatherStateNotifier, WeatherState>(
-        (ref) => WeatherStateNotifier(ref));
 
 class WeatherSearchPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen(weatherStateNotifierProvider, (previous, WeatherState next) {
-      if (next is WeatherError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.message),
-          ),
-        );
-      }
+    ref.listen<AsyncValue<Weather?>>(asyncWeatherProvider, (_, state) {
+      state.maybeMap(
+          error: (error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Couldn't fetch weather. Is the device online?"),
+              ),
+            );
+          },
+          orElse: () => {});
     });
     return Scaffold(
       appBar: AppBar(
@@ -31,19 +28,22 @@ class WeatherSearchPage extends ConsumerWidget {
         alignment: Alignment.center,
         child: Consumer(
           builder: (context, ref, child) {
-            final state = ref.watch(weatherStateNotifierProvider);
+            final state = ref.watch(asyncWeatherProvider);
 
-            if (state is WeatherInitial) {
-              return buildInitialInput();
-            } else if (state is WeatherLoading) {
-              return buildLoading();
-            } else if (state is WeatherLoaded) {
-              return buildColumnWithData(context, state.weather);
-            } else if (state is WeatherError) {
-              return buildInitialInput();
-            } else {
-              return SizedBox.shrink();
-            }
+            return state.maybeWhen(
+              data: (Weather? weather) {
+                if (weather == null) {
+                  return buildInitialInput();
+                }
+
+                return buildColumnWithData(context, weather);
+              },
+              error: (error, _) {
+                return buildInitialInput();
+              },
+              loading: () => buildLoading(),
+              orElse: () => SizedBox.shrink(),
+            );
           },
         ),
       ),
@@ -115,6 +115,6 @@ class CityInputField extends ConsumerWidget {
   }
 
   void submitCityName(WidgetRef ref, String cityName) {
-    ref.read(weatherStateNotifierProvider.notifier).getWeather(cityName);
+    ref.read(asyncWeatherProvider.notifier).getWeather(cityName);
   }
 }
